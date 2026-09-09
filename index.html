@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <meta name="theme-color" content="#080808"/>
 <link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png"/>
 <title>Meu Treino</title>
 <style>
 :root{
@@ -38,6 +39,14 @@ input{width:100%;background:#0a0a0a;border:1px solid #262626;color:#fff;border-r
 .btn{width:100%;border:none;border-radius:16px;background:var(--gold);color:#15120a;padding:14px;font-weight:800;margin-top:12px}
 .empty{padding:40px 12px;text-align:center;color:#777}
 @media (max-width:380px){.hero h1{font-size:31px}.sets{grid-template-columns:28px 1fr 1fr 38px}}
+
+.prefill{margin-top:10px;padding:10px 12px;border:1px solid #4b3d1f;background:#17130b;border-radius:14px;color:#d7b95f;font-size:12px;display:none}
+.prefill.show{display:block}.lastline{font-size:11px;color:#777;margin-top:6px}
+.setting{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #1f1f1f}.setting:last-child{border-bottom:0}
+.toggle{width:48px;height:28px;border-radius:20px;background:#242424;border:1px solid #333;position:relative}.toggle:after{content:"";position:absolute;width:22px;height:22px;border-radius:50%;background:#777;top:2px;left:2px;transition:.2s}.toggle.on{background:#5d4a20}.toggle.on:after{left:22px;background:var(--gold)}
+.exercise-select{width:100%;background:#0b0b0b;color:#fff;border:1px solid #2a2a2a;border-radius:14px;padding:12px;margin:12px 0}
+.chart{width:100%;height:180px;background:#0b0b0b;border:1px solid #1d1d1d;border-radius:16px;margin-top:12px}
+
 </style>
 </head>
 <body>
@@ -69,14 +78,27 @@ input{width:100%;background:#0a0a0a;border:1px solid #262626;color:#fff;border-r
   </div>
 
   <div id="historyView" class="view">
-    <div class="section-title"><h2>Evolução</h2><button class="pill" onclick="clearHistory()">Limpar</button></div>
-    <div class="card"><h3>Histórico de treinos</h3><div class="muted">Treinos finalizados ficam salvos neste aparelho.</div><div id="historyList"></div></div>
+    <div class="section-title"><h2>Evolução</h2></div>
+    <div class="card">
+      <h3>Histórico de cargas</h3>
+      <div class="muted">Veja a evolução por exercício.</div>
+      <select class="exercise-select" id="exerciseSelect" onchange="renderExerciseHistory()"></select>
+      <canvas id="loadChart" class="chart" width="420" height="180"></canvas>
+      <div id="exerciseHistoryList"></div>
+    </div>
+    <div class="card"><h3>Treinos finalizados</h3><div id="historyList"></div></div>
   </div>
 
   <div id="settingsView" class="view">
     <div class="section-title"><h2>Configurações</h2></div>
-    <div class="card"><h3>Dados salvos localmente</h3><div class="muted">Cargas, repetições, séries concluídas e histórico ficam no navegador do seu celular.</div></div>
-    <div class="card"><h3>Dica para iPhone</h3><div class="muted">Abra no Safari e use “Adicionar à Tela de Início” para ficar com aparência de app.</div></div>
+    <div class="card">
+      <div class="setting"><div><b>Pré-preencher cargas</b><div class="muted">Usa o último treino do exercício.</div></div><button class="toggle" id="prefillToggle" onclick="toggleSetting('prefill')"></button></div>
+      <div class="setting"><div><b>Timer automático</b><div class="muted">Começa ao concluir uma série.</div></div><button class="toggle" id="autoTimerToggle" onclick="toggleSetting('autoTimer')"></button></div>
+      <div class="setting"><div><b>Som ao terminar</b><div class="muted">Toca um alerta ao fim do descanso.</div></div><button class="toggle" id="soundToggle" onclick="toggleSetting('sound')"></button></div>
+      <div class="setting"><div><b>Vibração</b><div class="muted">Quando disponível.</div></div><button class="toggle" id="vibrateToggle" onclick="toggleSetting('vibrate')"></button></div>
+      <div class="setting"><div><b>Notificações</b><div class="muted">Avisa ao terminar o descanso.</div></div><button class="pill" onclick="requestNotifications()">Ativar</button></div>
+    </div>
+    <div class="card"><h3>Importante no iPhone</h3><div class="muted">As notificações funcionam melhor com o app instalado na Tela de Início e permissão concedida. O iOS pode suspender PWAs em segundo plano, então o aviso exato fora do app não é 100% garantido sem um serviço de push.</div></div>
   </div>
 </div>
 
@@ -94,7 +116,12 @@ const WORKOUT = {"Segunda": {"title": "Peito (FORÇA) + Tríceps", "subtitle": "
 const order = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
 const jsDay = new Date().getDay();
 let selectedDay = order[jsDay];
-let timerInterval=null, timeLeft=0;
+let timerInterval=null, timeLeft=0, timerEnd=null;
+const SETTINGS_KEY='treino:settings:v2';
+let settings={prefill:true,autoTimer:true,sound:true,vibrate:true,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')};
+function history(){return JSON.parse(localStorage.getItem('treino:history')||'[]')}
+function findLastExercise(name){for(const h of history()){const e=h.entries?.find(x=>x.exercise===name);if(e&&e.sets?.length)return {date:h.date,sets:e.sets};}return null}
+
 
 const key=(day,ex,set,field)=>`treino:${day}:${ex}:${set}:${field}`;
 function dayShort(d){return {"Domingo":"D","Segunda":"S","Terça":"T","Quarta":"Q","Quinta":"Q","Sexta":"S","Sábado":"S"}[d]}
@@ -127,29 +154,38 @@ function renderExercises(){
  list.innerHTML='';
  if(!w.exercises.length){list.innerHTML='<div class="empty">Hoje é descanso. Recuperação também faz parte do treino.</div>';updateProgress();return;}
  w.exercises.forEach((e,ei)=>{
-   const [name,sets,reps,rest]=e;
+   const [name,sets,reps,rest]=e, last=findLastExercise(name); let prefilled=false;
+   if(settings.prefill && last){
+     for(let si=0;si<+sets;si++){const prev=last.sets[si];if(!prev)continue;
+       const kk=key(selectedDay,ei,si,'kg'),rk=key(selectedDay,ei,si,'reps');
+       if(!localStorage.getItem(kk)&&prev.kg){localStorage.setItem(kk,prev.kg);prefilled=true}
+       if(!localStorage.getItem(rk)&&prev.reps){localStorage.setItem(rk,prev.reps);prefilled=true}
+     }
+   }
+   const lastText=last?`Último: ${last.sets.filter(s=>s.kg||s.reps).slice(0,2).map(s=>`${s.kg||'—'} kg × ${s.reps||'—'}`).join(' · ')}${last.sets.length>2?' …':''}`:'';
    const wrap=document.createElement('div'); wrap.className='exercise';
    wrap.innerHTML=`<div class="ex-head">
     <button class="check" id="excheck-${ei}" onclick="toggleExercise(${ei})">✓</button>
-    <div class="ex-main"><div class="ex-name">${name}</div><div class="meta">${sets} séries × ${reps} reps</div><div class="rest">Descanso: ${rest}</div></div>
+    <div class="ex-main"><div class="ex-name">${name}</div><div class="meta">${sets} séries × ${reps} reps</div><div class="rest">Descanso: ${rest}</div><div class="lastline">${lastText}</div></div>
     <button class="pill" onclick="startTimer(${restSeconds(rest)})">⏱</button>
    </div>
+   <div class="prefill ${prefilled?'show':''}">↻ Cargas e reps do último treino foram pré-preenchidas.</div>
    <div class="sets"><div class="hdr">S</div><div class="hdr">kg</div><div class="hdr">reps</div><div></div>
    ${Array.from({length:+sets},(_,si)=>`
     <div class="setnum">${si+1}</div>
     <input inputmode="decimal" placeholder="—" value="${localStorage.getItem(key(selectedDay,ei,si,'kg'))||''}" oninput="saveField(${ei},${si},'kg',this.value)">
     <input inputmode="numeric" placeholder="${reps}" value="${localStorage.getItem(key(selectedDay,ei,si,'reps'))||''}" oninput="saveField(${ei},${si},'reps',this.value)">
-    <button class="setdone ${localStorage.getItem(key(selectedDay,ei,si,'done'))==='1'?'on':''}" onclick="toggleSet(${ei},${si},this)">✓</button>`).join('')}
+    <button class="setdone ${localStorage.getItem(key(selectedDay,ei,si,'done'))==='1'?'on':''}" onclick="toggleSet(${ei},${si},this,${restSeconds(rest)})">✓</button>`).join('')}
    </div>`;
-   list.appendChild(wrap);
-   syncExercise(ei);
+   list.appendChild(wrap); syncExercise(ei);
  });
  updateProgress();
 }
 function saveField(ei,si,field,val){localStorage.setItem(key(selectedDay,ei,si,field),val)}
-function toggleSet(ei,si,btn){
+function toggleSet(ei,si,btn,restSec){
  const k=key(selectedDay,ei,si,'done'); const on=localStorage.getItem(k)==='1';
  localStorage.setItem(k,on?'0':'1'); btn.classList.toggle('on',!on); syncExercise(ei); updateProgress();
+ if(!on&&settings.autoTimer)startTimer(restSec);
 }
 function toggleExercise(ei){
  const sets=+WORKOUT[selectedDay].exercises[ei][1];
@@ -181,33 +217,49 @@ function renderWeek(){
 }
 function finishWorkout(){
  const w=WORKOUT[selectedDay]; if(!w.exercises.length)return;
- const entries=w.exercises.map((e,ei)=>({
-   exercise:e[0], sets:Array.from({length:+e[1]},(_,si)=>({
-    kg:localStorage.getItem(key(selectedDay,ei,si,'kg'))||'', reps:localStorage.getItem(key(selectedDay,ei,si,'reps'))||'', done:localStorage.getItem(key(selectedDay,ei,si,'done'))==='1'
-   }))
- }));
- const hist=JSON.parse(localStorage.getItem('treino:history')||'[]');
- hist.unshift({date:new Date().toISOString(),day:selectedDay,title:w.title,entries});
- localStorage.setItem('treino:history',JSON.stringify(hist.slice(0,100)));
- renderHistory(); alert('Treino salvo no histórico.');
+ const entries=w.exercises.map((e,ei)=>({exercise:e[0],sets:Array.from({length:+e[1]},(_,si)=>({kg:localStorage.getItem(key(selectedDay,ei,si,'kg'))||'',reps:localStorage.getItem(key(selectedDay,ei,si,'reps'))||'',done:localStorage.getItem(key(selectedDay,ei,si,'done'))==='1'}))}));
+ const hist=history(); hist.unshift({date:new Date().toISOString(),day:selectedDay,title:w.title,entries});localStorage.setItem('treino:history',JSON.stringify(hist.slice(0,200)));
+ w.exercises.forEach((e,ei)=>{for(let si=0;si<+e[1];si++){localStorage.removeItem(key(selectedDay,ei,si,'done'));localStorage.removeItem(key(selectedDay,ei,si,'kg'));localStorage.removeItem(key(selectedDay,ei,si,'reps'));}});
+ renderAll(); alert('Treino salvo. No próximo, as últimas cargas serão pré-preenchidas.');
+}
+function populateExerciseSelect(){
+ const s=document.getElementById('exerciseSelect');if(!s)return;const current=s.value;
+ const names=[...new Set(Object.values(WORKOUT).flatMap(w=>w.exercises.map(e=>e[0])))];s.innerHTML=names.map(n=>`<option>${n}</option>`).join('');if(current)s.value=current;
+}
+function renderExerciseHistory(){
+ const s=document.getElementById('exerciseSelect');if(!s)return;const name=s.value;
+ const data=history().map(h=>{const e=h.entries?.find(x=>x.exercise===name);if(!e)return null;const nums=e.sets.map(x=>parseFloat(String(x.kg).replace(',','.'))).filter(Number.isFinite);return nums.length?{date:h.date,max:Math.max(...nums),sets:e.sets}:null}).filter(Boolean).reverse();
+ const list=document.getElementById('exerciseHistoryList');drawChart(data);
+ list.innerHTML=data.length?[...data].reverse().slice(0,10).map(x=>`<div class="history-item"><b>${new Date(x.date).toLocaleDateString('pt-BR')}</b><div class="muted">Carga máx.: ${x.max} kg · ${x.sets.filter(s=>s.done).length} séries</div></div>`).join(''):'<div class="empty">Ainda não há histórico para este exercício.</div>';
+}
+function drawChart(data){
+ const c=document.getElementById('loadChart');if(!c)return;const ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b0b0b';ctx.fillRect(0,0,w,h);
+ ctx.strokeStyle='#222';for(let i=1;i<5;i++){const y=i*h/5;ctx.beginPath();ctx.moveTo(35,y);ctx.lineTo(w-15,y);ctx.stroke()}
+ if(!data.length)return;const vals=data.map(d=>d.max),min=Math.min(...vals),max=Math.max(...vals),span=Math.max(1,max-min);
+ const pts=data.map((d,i)=>({x:35+(w-55)*(data.length===1?.5:i/(data.length-1)),y:h-25-(h-50)*(d.max-min)/span}));
+ ctx.strokeStyle='#f0cf78';ctx.lineWidth=3;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();
+ ctx.fillStyle='#f0cf78';pts.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill()});
+ ctx.fillStyle='#888';ctx.font='11px system-ui';ctx.fillText(`${max}kg`,4,18);ctx.fillText(`${min}kg`,4,h-12);
 }
 function renderHistory(){
- const el=document.getElementById('historyList'), h=JSON.parse(localStorage.getItem('treino:history')||'[]');
- if(!h.length){el.innerHTML='<div class="empty">Nenhum treino finalizado ainda.</div>';return}
- el.innerHTML=h.map(x=>`<div class="history-item"><b>${x.title}</b><div class="muted">${new Date(x.date).toLocaleString('pt-BR')} · ${x.entries.reduce((n,e)=>n+e.sets.filter(s=>s.done).length,0)} séries concluídas</div></div>`).join('');
+ const el=document.getElementById('historyList'),h=history();if(!el)return;
+ el.innerHTML=h.length?h.slice(0,20).map(x=>`<div class="history-item"><b>${x.title}</b><div class="muted">${new Date(x.date).toLocaleString('pt-BR')} · ${x.entries.reduce((n,e)=>n+e.sets.filter(s=>s.done).length,0)} séries concluídas</div></div>`).join(''):'<div class="empty">Nenhum treino finalizado ainda.</div>';
+ populateExerciseSelect();renderExerciseHistory();
 }
-function clearHistory(){if(confirm('Apagar todo o histórico?')){localStorage.removeItem('treino:history');renderHistory()}}
-function startTimer(sec){
- clearInterval(timerInterval); timeLeft=sec; document.getElementById('timer').classList.add('show'); tick();
- timerInterval=setInterval(()=>{timeLeft--;tick(); if(timeLeft<=0){stopTimer(); if(navigator.vibrate)navigator.vibrate([200,100,200]);}},1000);
-}
-function tick(){document.getElementById('timerText').textContent=String(Math.floor(timeLeft/60)).padStart(2,'0')+':'+String(timeLeft%60).padStart(2,'0')}
-function stopTimer(){clearInterval(timerInterval);document.getElementById('timer').classList.remove('show')}
+function beep(){if(!settings.sound)return;try{const A=window.AudioContext||window.webkitAudioContext,a=new A(),o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=880;g.gain.value=.08;o.start();setTimeout(()=>{o.stop();a.close()},500)}catch(e){}}
+async function notifyDone(){beep();if(settings.vibrate&&navigator.vibrate)navigator.vibrate([250,100,250]);if('Notification'in window&&Notification.permission==='granted'){try{const reg=await navigator.serviceWorker.ready;reg.showNotification('Descanso concluído',{body:'Hora da próxima série.',icon:'./icon-192.png',tag:'rest-done'})}catch(e){}}}
+function startTimer(sec){clearInterval(timerInterval);timerEnd=Date.now()+sec*1000;document.getElementById('timer').classList.add('show');tick();timerInterval=setInterval(tick,250)}
+function tick(){if(!timerEnd)return;const left=Math.max(0,Math.ceil((timerEnd-Date.now())/1000));document.getElementById('timerText').textContent=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');if(left<=0){clearInterval(timerInterval);timerInterval=null;timerEnd=null;document.getElementById('timer').classList.remove('show');notifyDone()}}
+function stopTimer(){clearInterval(timerInterval);timerInterval=null;timerEnd=null;document.getElementById('timer').classList.remove('show')}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&timerEnd)tick()});
+async function requestNotifications(){if(!('Notification'in window)){alert('Este navegador não oferece notificações web.');return}const p=await Notification.requestPermission();alert(p==='granted'?'Notificações ativadas.':'Permissão não concedida.')}
+function toggleSetting(k){settings[k]=!settings[k];localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));renderSettings()}
+function renderSettings(){['prefill','autoTimer','sound','vibrate'].forEach(k=>document.getElementById(k+'Toggle')?.classList.toggle('on',!!settings[k]))}
 function showView(id,btn){
  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active');
  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));btn?.classList.add('active');
 }
-function renderAll(){renderCalendar();renderExercises();renderWeek();renderHistory()}
+function renderAll(){renderCalendar();renderExercises();renderWeek();renderHistory();renderSettings()}
 formatDate();renderAll();
 if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
 </script>
