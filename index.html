@@ -46,14 +46,16 @@
 #exercise .note{min-height:48px;height:48px}
 @media(max-width:350px){.artWrap{width:170px}.exText h1{font-size:23px}.muscleCard{grid-template-columns:72px minmax(0,1fr);gap:10px}.muscleCard img{width:72px;height:72px}}
 .seriesGrid .copySeriesRow{grid-column:1 / -1;padding:0 12px 10px}.copySeriesButton{display:block;width:100%;min-height:44px;border:1px solid var(--gold);border-radius:12px;background:transparent;color:var(--gold);padding:10px 8px;font:inherit;font-size:13px;line-height:1.4;cursor:pointer}.copySeriesButton:focus-visible{outline:2px solid var(--gold);outline-offset:3px}.copySeriesRow p{margin:7px 0 0;text-align:center;font-size:11px;color:#aaa}
+.heroTop{display:grid;grid-template-columns:minmax(0,1fr) 105px;gap:14px;align-items:center;margin-bottom:14px}.heroCopy{min-width:0}.hero h1{font-size:clamp(23px,6vw,31px);line-height:1.12;max-width:none;margin:12px 0 0;overflow-wrap:anywhere}.heroMuscle{display:block;width:105px;height:145px;object-fit:contain;object-position:center;background:#090909;border-radius:18px;padding:5px}.heroMuscle[hidden]{display:none}.heroTop.restDay{grid-template-columns:minmax(0,1fr)}.heroMeta{flex-wrap:wrap;gap:7px 12px}.hero .primary[hidden]{display:none}@media(max-width:350px){.hero{padding:16px}.heroTop{grid-template-columns:minmax(0,1fr) 85px;gap:10px}.heroMuscle{width:85px;height:125px}.hero h1{font-size:22px}}
+.d b{position:relative;display:block;width:36px;height:36px;line-height:36px;margin:5px auto 0;border-radius:50%}.d{min-height:58px;cursor:pointer}.dayCheck{position:absolute;right:-4px;bottom:-2px;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#79ce9d;color:#082115;border:2px solid #080808;font-size:12px;font-weight:900;line-height:1}.d:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:12px}.calendarStatus{margin:-2px 0 14px;color:#79ce9d;font-size:13px;line-height:1.5}.calendarStatus[hidden]{display:none}
 </style>
 </head>
 <body>
 <div id="app">
 <section class="screen active" id="home">
 <div class="topbar"><div class="brand"><img src="./icon-192.png">Meu Treino</div><button class="topIcon">♢</button></div>
-<div class="calendar" id="calendar"></div>
-<div class="hero"><div class="eyebrow">TREINO DE HOJE</div><h1 id="homeTitle"></h1><div class="heroMeta"><span id="homeEx"></span><span id="homeSets"></span><span>~ 60 min</span></div><button class="primary" onclick="openWorkout()">Iniciar treino →</button></div>
+<div class="calendar" id="calendar"></div><p id="calendarStatus" class="calendarStatus" role="status" hidden></p>
+<div class="hero"><div class="heroTop" id="homeHeroTop"><div class="heroCopy"><div class="eyebrow">TREINO DE HOJE</div><h1 id="homeTitle"></h1></div><img class="heroMuscle" id="homeMuscle" alt="" width="1086" height="1448" hidden></div><div class="heroMeta"><span id="homeEx"></span><span id="homeSets"></span><span id="homeDuration">~ 60 min</span></div><button id="homeStart" class="primary" onclick="openWorkout()">Iniciar treino →</button></div>
 <div class="card"><div style="display:flex;justify-content:space-between"><b>Progresso da semana</b><span class="muted" id="weekPct">0%</span></div><div class="progressline"><span id="weekBar"></span></div><div class="muted" id="weekDone"></div></div>
 <div class="kpis"><div class="kpi"><small>Volume</small><strong id="kpiVolume">0 kg</strong></div><div class="kpi"><small>Recordes</small><strong id="kpiPR">0</strong></div><div class="kpi"><small>Sequência</small><strong id="kpiStreak">0 dias</strong></div></div>
 <div class="card quote">“Disciplina hoje, resultados amanhã.”</div>
@@ -156,8 +158,31 @@ function artFor(name){
   return `./${EXERCISE_ART[illustrationKey(name)]}`;
 }
 function init(){renderCalendar();renderHome();renderWorkout();renderAllExercises();renderHistorySelect();renderSettings();if("serviceWorker"in navigator)navigator.serviceWorker.register("./service-worker.js").catch(()=>{})}
-function renderCalendar(){let c=document.getElementById("calendar");c.innerHTML="";DAYS.forEach((d,i)=>{let dt=new Date(),diff=i-new Date().getDay();dt.setDate(dt.getDate()+diff);let b=document.createElement("button");b.className="d"+(d===day?" active":"");b.innerHTML=`${d[0]}<b>${dt.getDate()}</b>`;b.onclick=()=>{day=d;renderCalendar();renderHome();renderWorkout()};c.appendChild(b)})}
-function renderHome(){let w=WORKOUT[day];document.getElementById('homeTitle').textContent=w.title;document.getElementById('homeEx').textContent=`⊕ ${w.exercises.length} exercícios`;document.getElementById('homeSets').textContent=`≡ ${w.exercises.reduce((a,e)=>a+e[1],0)} séries`;let hist=H(),week=hist.filter(h=>Date.now()-new Date(h.date)<7*864e5),u=new Set(week.map(h=>h.day)).size,p=Math.min(100,Math.round(u/6*100));weekPct.textContent=p+"%";weekBar.style.width=p+"%";weekDone.textContent=`${u}/6 treinos`;let vol=hist.reduce((a,h)=>a+h.entries.reduce((x,e)=>x+e.sets.reduce((s,z)=>s+(+z.kg||0)*(+z.reps||0),0),0),0);kpiVolume.textContent=Math.round(vol).toLocaleString("pt-BR")+" kg";kpiPR.textContent=countPRs();kpiStreak.textContent=Math.min(hist.length,7)+" dias"}
+function completedWeekDays(history=H(),now=new Date()){
+ const start=new Date(now);start.setHours(0,0,0,0);start.setDate(start.getDate()-start.getDay());
+ const end=new Date(start);end.setDate(end.getDate()+7);
+ return new Set(history.filter(h=>{const date=new Date(h.date);return date>=start&&date<end&&date<=now&&WORKOUT[h.day]?.exercises.length>0}).map(h=>h.day));
+}
+function renderCalendar(){
+ const c=document.getElementById("calendar"),now=new Date(),done=completedWeekDays(H(),now);c.innerHTML="";
+ DAYS.forEach((d,i)=>{const dt=new Date(now);dt.setDate(dt.getDate()+i-now.getDay());const b=document.createElement("button"),complete=done.has(d);
+ b.type="button";b.className="d"+(d===day?" active":"")+(complete?" completed":"");
+ b.setAttribute("aria-pressed",String(d===day));b.setAttribute("aria-label",d+", "+dt.toLocaleDateString("pt-BR")+(complete?", treino concluído":""));
+ b.innerHTML=`${d[0]}<b>${dt.getDate()}${complete?'<span class="dayCheck" aria-hidden="true">✓</span>':''}</b>`;
+ b.onclick=()=>{day=d;renderHome();renderWorkout()};c.appendChild(b)});
+ const status=document.getElementById("calendarStatus");status.hidden=!done.has(day);status.textContent=done.has(day)?"✓ Treino de "+day.toLowerCase()+" concluído":"";
+}
+const HOME_ART={"Segunda": "segunda", "Terça": "terca", "Quarta": "quarta", "Quinta": "quinta", "Sexta": "sexta", "Sábado": "sabado"};
+function renderHomeArt(){
+ const slug=HOME_ART[day],img=document.getElementById('homeMuscle'),rest=!slug;
+ img.hidden=rest;
+ if(slug){img.src='./home-muscles/'+slug+'.png';img.alt=day==='Terça'?'Destaque dos músculos das costas':day==='Quarta'?'Destaque dos quadríceps':'Grupos musculares: '+WORKOUT[day].title}
+ else{img.removeAttribute('src');img.alt=''}
+ document.getElementById('homeHeroTop').classList.toggle('restDay',rest);
+ document.getElementById('homeStart').hidden=rest;
+ document.getElementById('homeDuration').textContent=rest?'Recuperação':'~ 60 min';
+}
+function renderHome(){renderCalendar();let w=WORKOUT[day];renderHomeArt();document.getElementById('homeTitle').textContent=w.title;document.getElementById('homeEx').textContent=`⊕ ${w.exercises.length} exercícios`;document.getElementById('homeSets').textContent=`≡ ${w.exercises.reduce((a,e)=>a+e[1],0)} séries`;let hist=H(),u=completedWeekDays(hist).size,p=Math.min(100,Math.round(u/6*100));weekPct.textContent=p+"%";weekBar.style.width=p+"%";weekDone.textContent=`${u}/6 treinos`;let vol=hist.reduce((a,h)=>a+h.entries.reduce((x,e)=>x+e.sets.reduce((s,z)=>s+(+z.kg||0)*(+z.reps||0),0),0),0);kpiVolume.textContent=Math.round(vol).toLocaleString("pt-BR")+" kg";kpiPR.textContent=countPRs();kpiStreak.textContent=Math.min(hist.length,7)+" dias"}
 function countPRs(){let n=0;[...new Set(Object.values(WORKOUT).flatMap(w=>w.exercises.map(e=>e[0])))].forEach(name=>{let d=exSeries(name);if(d.length>1&&d.at(-1).max>d.at(-2).max)n++});return n}
 function openWorkout(){if(!WORKOUT[day].exercises.length){toast("Hoje é descanso.");return}go("workout")}
 function renderWorkout(){let w=WORKOUT[day];workoutTitle.textContent=w.title;let list=workoutList;list.innerHTML="";let done=0;w.exercises.forEach((e,i)=>{let c=localStorage.getItem(`mt:exdone:${day}:${e[0]}`)==="1";if(c)done++;let last=lastExercise(e[0]),lt="";if(last){let s=last.sets.find(x=>x.kg||x.reps);if(s)lt=`Último: ${s.kg||"—"} kg × ${s.reps||"—"}`}let row=document.createElement("div");row.className="exRow";row.innerHTML=`<div class="num ${c?"done":""}">${c?"✓":i+1}</div><img class="thumb" src="${artFor(e[0])}" alt="${artLabel(e[0])}" width="72" height="72"><div class="exInfo"><b>${e[0]}</b><div>${e[1]} × ${e[2]} · ${e[3]}</div><div>${lt}</div></div><div>›</div>`;row.onclick=()=>openExercise(i);list.appendChild(row)});let pct=w.exercises.length?Math.round(done/w.exercises.length*100):0;workoutCounter.textContent=`${done}/${w.exercises.length} exercícios`;workoutPct.textContent=pct+"%";workoutBar.style.width=pct+"%"}
