@@ -33,7 +33,18 @@
 .exInfo{min-width:0}.exInfo b{overflow-wrap:anywhere}
 #legVariantWrap{margin-top:12px}#legVariantWrap label{font-size:14px;color:var(--gold)}
 @media(max-width:390px){.exerciseArt{max-height:none}.exText h1{font-size:24px}.thumb{width:60px;height:60px;flex-basis:60px}.exRow{gap:8px}}
-.muscleCard img{display:block;width:100%;max-width:300px;height:auto;aspect-ratio:1;object-fit:contain;object-position:center;float:none;margin:0 auto 12px;border-radius:12px;background:#080808}.muscleCard b{font-size:14px}.muscleCard p{font-size:13px}
+.exTop{gap:12px}
+.exText{text-align:center}.exText h1{margin:0 0 6px;font-size:27px;line-height:1.15}.exText .focus{font-size:14px;line-height:1.4}
+.artWrap{width:min(100%,190px);margin:0 auto}
+.exerciseArt{width:100%;height:auto;max-height:none;aspect-ratio:1;object-fit:contain;padding:4px;border-radius:18px}
+.muscleCard{display:grid;grid-template-columns:80px minmax(0,1fr);align-items:center;gap:12px;margin-top:0;padding:10px;text-align:left}
+.muscleCard img{display:block;width:80px;height:80px;max-width:100%;aspect-ratio:1;object-fit:contain;object-position:center;float:none;margin:0;border-radius:12px;background:#080808}
+.muscleCard b{font-size:14px}.muscleCard p{font-size:13px;line-height:1.5;margin:5px 0 0;overflow-wrap:anywhere}
+#legVariantWrap{margin-top:10px;text-align:left}
+#exercise .header{margin-bottom:10px}.exerciseHeading{flex:1;text-align:center;color:#aaa;font-size:12px;font-weight:700;letter-spacing:2px}
+#exercise .tabs{margin:10px 0}#exercise .tabs button{min-height:44px;padding:8px 4px}
+#exercise .note{min-height:48px;height:48px}
+@media(max-width:350px){.artWrap{width:170px}.exText h1{font-size:23px}.muscleCard{grid-template-columns:72px minmax(0,1fr);gap:10px}.muscleCard img{width:72px;height:72px}}
 </style>
 </head>
 <body>
@@ -54,10 +65,11 @@
 </section>
 
 <section class="screen" id="exercise">
-<div class="header"><button class="back" onclick="go('workout')">‹</button><div style="flex:1"></div><button class="back" style="color:var(--gold)">☆</button></div>
+<div class="header"><button class="back" onclick="go('workout')" aria-label="Voltar">‹</button><div class="exerciseHeading">EXERCÍCIO</div><button class="back" style="color:var(--gold)">☆</button></div>
 <div class="exTop">
+  <div class="exText"><h1 id="exName"></h1><div class="focus" id="exFocus"></div><div id="legVariantWrap" hidden><label for="legVariant">Equipamento</label><select id="legVariant" class="select" onchange="changeLegVariant(this.value)"><option value="hack">Hack Squat</option><option value="legpress">Leg Press</option></select></div></div>
   <div class="artWrap"><img id="exerciseArt" class="exerciseArt" alt="" width="1254" height="1254"></div>
-  <div class="exText"><h1 id="exName"></h1><div class="focus" id="exFocus"></div><div id="legVariantWrap" hidden><label for="legVariant">Equipamento</label><select id="legVariant" class="select" onchange="changeLegVariant(this.value)"><option value="hack">Hack Squat</option><option value="legpress">Leg Press</option></select></div><div class="muscleCard"><img id="muscleMap"><b>Músculos principais</b><p id="muscleText"></p><div style="clear:both"></div></div></div>
+  <div class="muscleCard"><img id="muscleMap" width="1254" height="1254"><div><b>Músculos principais</b><p id="muscleText"></p></div></div>
 </div>
 <div class="tabs"><button class="active" onclick="setTab('series',this)">Séries</button><button onclick="setTab('history',this)">Histórico</button><button onclick="setTab('chart',this)">Gráficos</button><button onclick="setTab('details',this)">Detalhes</button></div>
 
