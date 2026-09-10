@@ -45,6 +45,7 @@
 #exercise .tabs{margin:10px 0}#exercise .tabs button{min-height:44px;padding:8px 4px}
 #exercise .note{min-height:48px;height:48px}
 @media(max-width:350px){.artWrap{width:170px}.exText h1{font-size:23px}.muscleCard{grid-template-columns:72px minmax(0,1fr);gap:10px}.muscleCard img{width:72px;height:72px}}
+.seriesGrid .copySeriesRow{grid-column:1 / -1;padding:0 12px 10px}.copySeriesButton{display:block;width:100%;min-height:44px;border:1px solid var(--gold);border-radius:12px;background:transparent;color:var(--gold);padding:10px 8px;font:inherit;font-size:13px;line-height:1.4;cursor:pointer}.copySeriesButton:focus-visible{outline:2px solid var(--gold);outline-offset:3px}.copySeriesRow p{margin:7px 0 0;text-align:center;font-size:11px;color:#aaa}
 </style>
 </head>
 <body>
@@ -165,7 +166,24 @@ const MUSCLE_ART={"benchpress": ["Peito", "peito"], "inclinepress": ["Peito", "p
 function muscleGroupFor(family){return MUSCLE_ART[family][0]}
 function muscleArtFor(family){return "./muscles/"+MUSCLE_ART[family][1]+".png"}
 function prepareExercise(){let e=WORKOUT[day].exercises[activeExercise],name=e[0],fam=FAMILIES[name],m=MUSCLES[fam]||["Core","Músculos principais"];exName.textContent=name;exFocus.textContent=m[0]+" · "+WORKOUT[day].focus;exerciseArt.src=artFor(name);exerciseArt.alt=artLabel(name);legVariantWrap.hidden=name!=="Hack Squat / Leg Press";legVariant.value=localStorage.getItem("mt:legVariant")==="legpress"?"legpress":"hack";muscleMap.src=muscleArtFor(fam);muscleMap.alt="Grupo muscular: "+muscleGroupFor(fam);muscleText.textContent=m[1];exerciseDetails.textContent=(name==="Abdômen"?"Ilustração: abdominal tradicional no solo. ":"")+`Meta: ${e[1]} séries de ${e[2]} repetições. Descanso recomendado: ${e[3]}.`;let last=lastExercise(name),base=e[1]+(extraSets[name]||0);if(settings.prefill&&last){for(let i=0;i<base;i++){let s=last.sets[i];if(!s)continue;if(!localStorage.getItem(k(name,i,"kg"))&&s.kg)localStorage.setItem(k(name,i,"kg"),s.kg);if(!localStorage.getItem(k(name,i,"reps"))&&s.reps)localStorage.setItem(k(name,i,"reps"),s.reps)}}prefillBox.style.display=(last&&settings.prefill)?"block":"none";restLabel.textContent=`Descanso: ${e[3]}`;renderSeries();renderExerciseHistory();drawChart("exerciseChart",exSeries(name));timerText.textContent="00:00"}
-function renderSeries(){let e=WORKOUT[day].exercises[activeExercise],name=e[0],n=e[1]+(extraSets[name]||0),g=seriesGrid;g.innerHTML='<div class="th">Série</div><div class="th">Carga (kg)</div><div class="th">Reps</div><div class="th">✓</div>';for(let i=0;i<n;i++){g.insertAdjacentHTML("beforeend",`<div style="text-align:center;color:#888">${i+1}</div><div><input inputmode="decimal" value="${localStorage.getItem(k(name,i,"kg"))||""}" oninput="saveSetValue(${i},'kg',this.value)"></div><div><input inputmode="numeric" value="${localStorage.getItem(k(name,i,"reps"))||""}" placeholder="${e[2]}" oninput="saveSetValue(${i},'reps',this.value)"></div><div><button class="check ${localStorage.getItem(k(name,i,"done"))==="1"?"on":""}" onclick="toggleSet(${i},this)">✓</button></div>`)}}
+function renderSeries(){let e=WORKOUT[day].exercises[activeExercise],name=e[0],n=e[1]+(extraSets[name]||0),g=seriesGrid;g.innerHTML='<div class="th">Série</div><div class="th">Carga (kg)</div><div class="th">Reps</div><div class="th">✓</div>';for(let i=0;i<n;i++){g.insertAdjacentHTML("beforeend",`<div style="text-align:center;color:#888">${i+1}</div><div><input inputmode="decimal" value="${localStorage.getItem(k(name,i,"kg"))||""}" oninput="saveSetValue(${i},'kg',this.value)"></div><div><input inputmode="numeric" value="${localStorage.getItem(k(name,i,"reps"))||""}" placeholder="${e[2]}" oninput="saveSetValue(${i},'reps',this.value)"></div><div><button class="check ${localStorage.getItem(k(name,i,"done"))==="1"?"on":""}" onclick="toggleSet(${i},this)">✓</button></div>`);if(i===0&&n>1)g.insertAdjacentHTML("beforeend",'<div class="copySeriesRow"><button type="button" class="copySeriesButton" onclick="copyFirstSeries()">⧉ Copiar para as próximas séries</button><p>Preenche só os campos vazios.</p></div>')}}
+
+function copyFirstSeries(){
+ const e=WORKOUT[day].exercises[activeExercise],name=e[0],n=e[1]+(extraSets[name]||0);
+ const source={kg:(localStorage.getItem(k(name,0,"kg"))||"").trim(),reps:(localStorage.getItem(k(name,0,"reps"))||"").trim()};
+ if(!source.kg&&!source.reps){toast("Preencha a carga ou as repetições da primeira série.");return}
+ let copied=0;
+ for(let i=1;i<n;i++){
+  if(localStorage.getItem(k(name,i,"done"))==="1")continue;
+  for(const field of ["kg","reps"]){
+   if(source[field]&&!(localStorage.getItem(k(name,i,field))||"").trim()){
+    localStorage.setItem(k(name,i,field),source[field]);copied++;
+   }
+  }
+ }
+ if(copied){renderSeries();toast("Valores copiados para os campos vazios.")}
+ else toast("Nenhum campo vazio nas próximas séries pendentes.");
+}
 function saveSetValue(i,field,value){localStorage.setItem(k(WORKOUT[day].exercises[activeExercise][0],i,field),value)}
 function toggleSet(i,b){let e=WORKOUT[day].exercises[activeExercise],name=e[0],kk=k(name,i,"done"),on=localStorage.getItem(kk)==="1";localStorage.setItem(kk,on?"0":"1");b.classList.toggle("on",!on);if(!on&&settings.autoTimer)startTimer(restSec(e[3]))}
 function addSet(){let name=WORKOUT[day].exercises[activeExercise][0];extraSets[name]=(extraSets[name]||0)+1;renderSeries()}
