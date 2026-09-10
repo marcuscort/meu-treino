@@ -1,0 +1,15 @@
+MEU TREINO — ILUSTRAÇÕES INDIVIDUAIS
+
+Abra index.html para usar o app. Para instalação e funcionamento offline, publique o conteúdo desta pasta no mesmo endereço HTTPS do app anterior.
+Mantenha a pasta illustrations junto de index.html.
+
+38 imagens individuais: 37 exercícios distintos e a alternativa Leg Press.
+Na tela Hack Squat / Leg Press, escolha o equipamento para alternar a ilustração.
+Abdômen é representado pelo abdominal tradicional no solo.
+
+As imagens usam object-fit: contain, sem recortes ou mosaicos.
+O cache foi atualizado para carregar os novos arquivos.
+A estrutura do treino e as chaves do histórico foram preservadas. O histórico permanece no navegador e endereço onde foi registrado; o ZIP não contém esses dados pessoais.
+
+Verificações concluídas: integridade de todos os PNGs, correspondência dos 40 itens do treino, caminhos e cache offline, sintaxe dos scripts, gravação de cargas/repetições e alternância Hack/Leg Press.
+Limitação: a revisão visual no navegador não pôde ser realizada, pois a abertura da prévia local foi bloqueada neste ambiente.
